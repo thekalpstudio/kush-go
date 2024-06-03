@@ -156,3 +156,45 @@ func (c *TokenERC721Contract) Approve(ctx kalpsdk.TransactionContextInterface, o
 
     return true, nil
 }
+
+func (c *TokenERC721Contract) SetApprovalForAll(ctx kalpsdk.TransactionContextInterface, operator string, approved bool) (bool, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return false, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return false, fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    sender, err := ctx.GetUserID()
+    if err != nil {
+        return false, fmt.Errorf("failed to GetClientIdentity: %v", err)
+    }
+
+    nftApproval := new(Approval)
+    nftApproval.Owner = sender
+    nftApproval.Operator = operator
+    nftApproval.Approved = approved
+
+    approvalKey, err := ctx.CreateCompositeKey(approvalPrefix, []string{sender, operator})
+    if err != nil {
+        return false, fmt.Errorf("failed to CreateCompositeKey: %v", err)
+    }
+
+    approvalBytes, err := json.Marshal(nftApproval)
+    if err != nil {
+        return false, fmt.Errorf("failed to marshal approvalBytes: %v", err)
+    }
+
+    err = ctx.PutStateWithoutKYC(approvalKey, approvalBytes)
+    if err != nil {
+        return false, fmt.Errorf("failed to PutState approvalBytes: %v", err)
+    }
+
+    err = ctx.SetEvent("ApprovalForAll", approvalBytes)
+    if err != nil {
+        return false, fmt.Errorf("failed to SetEvent ApprovalForAll: %v", err)
+    }
+
+    return true, nil
+}
