@@ -93,3 +93,66 @@ func (c *TokenERC721Contract) BalanceOf(ctx kalpsdk.TransactionContextInterface,
     }
     return balance
 }
+func (c *TokenERC721Contract) OwnerOf(ctx kalpsdk.TransactionContextInterface, tokenId string) (string, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return "", fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    nft, err := _readNFT(ctx, tokenId)
+    if err != nil {
+        return "", fmt.Errorf("could not process OwnerOf for tokenId: %w", err)
+    }
+
+    return nft.Owner, nil
+}
+
+func (c *TokenERC721Contract) Approve(ctx kalpsdk.TransactionContextInterface, operator string, tokenId string) (bool, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return false, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return false, fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    sender, err := ctx.GetUserID()
+    if err != nil {
+        return false, fmt.Errorf("failed to GetClientIdentity: %v", err)
+    }
+
+    nft, err := _readNFT(ctx, tokenId)
+    if err != nil {
+        return false, fmt.Errorf("failed to _readNFT: %v", err)
+    }
+
+    owner := nft.Owner
+    operatorApproval, err := c.IsApprovedForAll(ctx, owner, sender)
+    if err != nil {
+        return false, fmt.Errorf("failed to get IsApprovedForAll: %v", err)
+    }
+    if owner != sender && !operatorApproval {
+        return false, fmt.Errorf("the sender is not the current owner nor an authorized operator")
+    }
+
+    nft.Approved = operator
+    nftKey, err := ctx.CreateCompositeKey(nftPrefix, []string{tokenId})
+    if err != nil {
+        return false, fmt.Errorf("failed to CreateCompositeKey %s: %v", nftKey, err)
+    }
+
+    nftBytes, err := json.Marshal(nft)
+    if err != nil {
+        return false, fmt.Errorf("failed to marshal nftBytes: %v", err)
+    }
+
+    err = ctx.PutStateWithoutKYC(nftKey, nftBytes)
+    if err != nil {
+        return false, fmt.Errorf("failed to PutState for nftKey: %v", err)
+    }
+
+    return true, nil
+}
