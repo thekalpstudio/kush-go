@@ -198,3 +198,35 @@ func (c *TokenERC721Contract) SetApprovalForAll(ctx kalpsdk.TransactionContextIn
 
     return true, nil
 }
+
+
+func (c *TokenERC721Contract) IsApprovedForAll(ctx kalpsdk.TransactionContextInterface, owner string, operator string) (bool, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return false, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return false, fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    approvalKey, err := ctx.CreateCompositeKey(approvalPrefix, []string{owner, operator})
+    if err != nil {
+        return false, fmt.Errorf("failed to CreateCompositeKey: %v", err)
+    }
+    approvalBytes, err := ctx.GetState(approvalKey)
+    if err != nil {
+        return false, fmt.Errorf("failed to GetState approvalBytes %s: %v", approvalBytes, err)
+    }
+
+    if len(approvalBytes) < 1 {
+        return false, nil
+    }
+
+    approval := new(Approval)
+    err = json.Unmarshal(approvalBytes, approval)
+    if err != nil {
+        return false, fmt.Errorf("failed to Unmarshal: %v, string %s", err, string(approvalBytes))
+    }
+
+    return approval.Approved, nil
+}
