@@ -407,3 +407,33 @@ func (c *TokenERC721Contract) TotalSupply(ctx kalpsdk.TransactionContextInterfac
     }
     return totalSupply
 }
+
+func (c *TokenERC721Contract) Initialize(ctx kalpsdk.TransactionContextInterface, name string, symbol string) (bool, error) {
+    clientMSPID, err := ctx.GetClientIdentity().GetMSPID()
+    if err != nil {
+        return false, fmt.Errorf("failed to get clientMSPID: %v", err)
+    }
+    if clientMSPID != "mailabs" {
+        return false, fmt.Errorf("client is not authorized to set the name and symbol of the token")
+    }
+
+    bytes, err := ctx.GetState(nameKey)
+    if err != nil {
+        return false, fmt.Errorf("failed to get Name: %v", err)
+    }
+    if bytes != nil {
+        return false, fmt.Errorf("contract options are already set, client is not authorized to change them")
+    }
+
+    err = ctx.PutStateWithoutKYC(nameKey, []byte(name))
+    if err != nil {
+        return false, fmt.Errorf("failed to PutState nameKey %s: %v", nameKey, err)
+    }
+
+    err = ctx.PutStateWithoutKYC(symbolKey, []byte(symbol))
+    if err != nil {
+        return false, fmt.Errorf("failed to PutState symbolKey %s: %v", symbolKey, err)
+    }
+
+    return true, nil
+}
