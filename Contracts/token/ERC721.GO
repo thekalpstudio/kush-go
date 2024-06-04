@@ -604,3 +604,15 @@ func (c *TokenERC721Contract) ClientAccountID(ctx kalpsdk.TransactionContextInte
 
     return clientAccount, nil
 }
+
+
+func checkInitialized(ctx kalpsdk.TransactionContextInterface) (bool, error) {
+    tokenName, err := ctx.GetState(nameKey)
+    if err != nil {
+        return false, fmt.Errorf("failed to get token name: %v", err)
+    }
+    if tokenName == nil {
+        return false, nil
+    }
+    return true, nil
+}
