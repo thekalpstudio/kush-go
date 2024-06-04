@@ -230,3 +230,19 @@ func (c *TokenERC721Contract) IsApprovedForAll(ctx kalpsdk.TransactionContextInt
 
     return approval.Approved, nil
 }
+
+func (c *TokenERC721Contract) GetApproved(ctx kalpsdk.TransactionContextInterface, tokenId string) (string, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return "false", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return "false", fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    nft, err := _readNFT(ctx, tokenId)
+    if err != nil {
+        return "false", fmt.Errorf("failed GetApproved for tokenId : %v", err)
+    }
+    return nft.Approved, nil
+}
