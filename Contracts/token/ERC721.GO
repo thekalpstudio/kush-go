@@ -246,3 +246,90 @@ func (c *TokenERC721Contract) GetApproved(ctx kalpsdk.TransactionContextInterfac
     }
     return nft.Approved, nil
 }
+
+func (c *TokenERC721Contract) TransferFrom(ctx kalpsdk.TransactionContextInterface, from string, to string, tokenId string) (bool, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return false, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return false, fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    sender, err := ctx.GetUserID()
+    if err != nil {
+        return false, fmt.Errorf("failed to GetClientIdentity: %v", err)
+    }
+
+    nft, err := _readNFT(ctx, tokenId)
+    if err != nil {
+        return false, fmt.Errorf("failed to _readNFT : %v", err)
+    }
+
+    owner := nft.Owner
+    operator := nft.Approved
+    operatorApproval, err := c.IsApprovedForAll(ctx, owner, sender)
+    if err != nil {
+        return false, fmt.Errorf("failed to get IsApprovedForAll : %v", err)
+    }
+    if owner != sender && operator != sender && !operatorApproval {
+        return false, fmt.Errorf("the sender is not the current owner nor an authorized operator")
+    }
+
+    if owner != from {
+        return false, fmt.Errorf("the from is not the current owner")
+    }
+
+    nft.Approved = ""
+    nft.Owner = to
+    nftKey, err := ctx.CreateCompositeKey(nftPrefix, []string{tokenId})
+    if err != nil {
+        return false, fmt.Errorf("failed to CreateCompositeKey: %v", err)
+    }
+
+    nftBytes, err := json.Marshal(nft)
+    if err != nil {
+        return false, fmt.Errorf("failed to marshal approval: %v", err)
+    }
+
+    err = ctx.PutStateWithoutKYC(nftKey, nftBytes)
+    if err != nil {
+        return false, fmt.Errorf("failed to PutState nftBytes %s: %v", nftBytes, err)
+    }
+
+    balanceKeyFrom, err := ctx.CreateCompositeKey(balancePrefix, []string{from, tokenId})
+    if err != nil {
+        return false, fmt.Errorf("failed to CreateCompositeKey from: %v", err)
+    }
+
+    err = ctx.DelStateWithoutKYC(balanceKeyFrom)
+    if err != nil {
+        return false, fmt.Errorf("failed to DelState balanceKeyFrom %s: %v", nftBytes, err)
+    }
+
+    balanceKeyTo, err := ctx.CreateCompositeKey(balancePrefix, []string{to, tokenId})
+    if err != nil {
+        return false, fmt.Errorf("failed to CreateCompositeKey to: %v", err)
+    }
+    err = ctx.PutStateWithoutKYC(balanceKeyTo, []byte{0})
+    if err != nil {
+        return false, fmt.Errorf("failed to PutState balanceKeyTo %s: %v", balanceKeyTo, err)
+    }
+
+    transferEvent := new(Transfer)
+    transferEvent.From = from
+    transferEvent.To = to
+    transferEvent.TokenId = tokenId
+
+    transferEventBytes, err := json.Marshal(transferEvent)
+    if err != nil {
+        return false, fmt.Errorf("failed to marshal transferEventBytes: %v", err)
+    }
+
+    err = ctx.SetEvent("Transfer", transferEventBytes)
+    if err != nil {
+        return false, fmt.Errorf("failed to SetEvent transferEventBytes %s: %v", transferEventBytes, err)
+    }
+    return true, nil
+}
+
