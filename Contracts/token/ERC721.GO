@@ -571,3 +571,36 @@ func (c *TokenERC721Contract) Burn(ctx kalpsdk.TransactionContextInterface, toke
 
     return true, nil
 }
+func (c *TokenERC721Contract) ClientAccountBalance(ctx kalpsdk.TransactionContextInterface) (int, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return 0, fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    clientAccountID, err := ctx.GetUserID()
+    if err != nil {
+        return 0, fmt.Errorf("failed to GetClientIdentity minter: %v", err)
+    }
+
+    return c.BalanceOf(ctx, clientAccountID), nil
+}
+
+func (c *TokenERC721Contract) ClientAccountID(ctx kalpsdk.TransactionContextInterface) (string, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return "", fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    clientAccount, err := ctx.GetUserID()
+    if err != nil {
+        return "", fmt.Errorf("failed to GetClientIdentity minter: %v", err)
+    }
+
+    return clientAccount, nil
+}
