@@ -366,3 +366,19 @@ func (c *TokenERC721Contract) Symbol(ctx kalpsdk.TransactionContextInterface) (s
 
     return string(bytes), nil
 }
+
+func (c *TokenERC721Contract) TokenURI(ctx kalpsdk.TransactionContextInterface, tokenId string) (string, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return "", fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    nft, err := _readNFT(ctx, tokenId)
+    if err != nil {
+        return "", fmt.Errorf("failed to get TokenURI: %v", err)
+    }
+    return nft.TokenURI, nil
+}
