@@ -512,3 +512,62 @@ func (c *TokenERC721Contract) MintWithTokenURI(ctx kalpsdk.TransactionContextInt
 
     return nft, nil
 }
+func (c *TokenERC721Contract) Burn(ctx kalpsdk.TransactionContextInterface, tokenId string) (bool, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return false, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return false, fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    owner, err := ctx.GetUserID()
+    if err != nil {
+        return false, fmt.Errorf("failed to GetClientIdentity owner64: %v", err)
+    }
+
+    nft, err := _readNFT(ctx, tokenId)
+    if err != nil {
+        return false, fmt.Errorf("failed to _readNFT nft : %v", err)
+    }
+    if nft.Owner != owner {
+        return false, fmt.Errorf("non-fungible token %s is not owned by %s", tokenId, owner)
+    }
+
+    nftKey, err := ctx.CreateCompositeKey(nftPrefix, []string{tokenId})
+    if err != nil {
+        return false, fmt.Errorf("failed to CreateCompositeKey tokenId: %v", err)
+    }
+
+    err = ctx.DelStateWithoutKYC(nftKey)
+    if err != nil {
+        return false, fmt.Errorf("failed to DelState nftKey: %v", err)
+    }
+
+    balanceKey, err := ctx.CreateCompositeKey(balancePrefix, []string{owner, tokenId})
+    if err != nil {
+        return false, fmt.Errorf("failed to CreateCompositeKey balanceKey %s: %v", balanceKey, err)
+    }
+
+    err = ctx.DelStateWithoutKYC(balanceKey)
+    if err != nil {
+        return false, fmt.Errorf("failed to DelState balanceKey %s: %v", balanceKey, err)
+    }
+
+    transferEvent := new(Transfer)
+    transferEvent.From = owner
+    transferEvent.To = "0x0"
+    transferEvent.TokenId = tokenId
+
+    transferEventBytes, err := json.Marshal(transferEvent)
+    if err != nil {
+        return false, fmt.Errorf("failed to marshal transferEventBytes: %v", err)
+    }
+
+    err = ctx.SetEvent("Transfer", transferEventBytes)
+    if err != nil {
+        return false, fmt.Errorf("failed to SetEvent transferEventBytes: %v", err)
+    }
+
+    return true, nil
+}
