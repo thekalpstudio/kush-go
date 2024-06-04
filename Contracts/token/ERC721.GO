@@ -333,3 +333,19 @@ func (c *TokenERC721Contract) TransferFrom(ctx kalpsdk.TransactionContextInterfa
     return true, nil
 }
 
+func (c *TokenERC721Contract) Name(ctx kalpsdk.TransactionContextInterface) (string, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return "", fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    bytes, err := ctx.GetState(nameKey)
+    if err != nil {
+        return "", fmt.Errorf("failed to get Name bytes: %s", err)
+    }
+
+    return string(bytes), nil
+}
