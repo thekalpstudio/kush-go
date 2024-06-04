@@ -382,3 +382,28 @@ func (c *TokenERC721Contract) TokenURI(ctx kalpsdk.TransactionContextInterface, 
     }
     return nft.TokenURI, nil
 }
+
+func (c *TokenERC721Contract) TotalSupply(ctx kalpsdk.TransactionContextInterface) int {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        panic("failed to check if contract is already initialized:" + err.Error())
+    }
+    if !initialized {
+        panic("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    iterator, err := ctx.GetStateByPartialCompositeKey(nftPrefix, []string{})
+    if err != nil {
+        panic("Error creating GetStateByPartialCompositeKey:" + err.Error())
+    }
+
+    totalSupply := 0
+    for iterator.HasNext() {
+        _, err := iterator.Next()
+        if err != nil {
+            return 0
+        }
+        totalSupply++
+    }
+    return totalSupply
+}
