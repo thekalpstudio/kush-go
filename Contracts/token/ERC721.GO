@@ -349,3 +349,20 @@ func (c *TokenERC721Contract) Name(ctx kalpsdk.TransactionContextInterface) (str
 
     return string(bytes), nil
 }
+
+func (c *TokenERC721Contract) Symbol(ctx kalpsdk.TransactionContextInterface) (string, error) {
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return "", fmt.Errorf("Contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
+
+    bytes, err := ctx.GetState(symbolKey)
+    if err != nil {
+        return "", fmt.Errorf("failed to get Symbol: %v", err)
+    }
+
+    return string(bytes), nil
+}
