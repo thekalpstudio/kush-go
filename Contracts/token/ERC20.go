@@ -303,3 +303,27 @@ func (c *TokenERC20Contract) Transfer(ctx kalpsdk.TransactionContextInterface, r
 
 	return nil
 }
+
+// BalanceOf returns the balance of the specified account.
+// It takes a transaction context and the account address as parameters.
+// It returns the balance as an integer and an error if any.
+func (c *TokenERC20Contract) BalanceOf(ctx kalpsdk.TransactionContextInterface, account string) (int, error) {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return 0, fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	balanceBytes, err := ctx.GetState(account)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read from world state: %v", err)
+	}
+	if balanceBytes == nil {
+		return 0, fmt.Errorf("the account %s does not exist", account)
+	}
+
+	balance, _ := strconv.Atoi(string(balanceBytes))
+	return balance, nil
+}
