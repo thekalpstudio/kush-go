@@ -407,3 +407,41 @@ func (c *TokenERC20Contract) TotalSupply(ctx kalpsdk.TransactionContextInterface
 
 	return totalSupply, nil
 }
+
+
+func (c *TokenERC20Contract) Approve(ctx kalpsdk.TransactionContextInterface, spender string, value int) error {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	owner, err := ctx.GetUserID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+
+	allowanceKey, err := ctx.CreateCompositeKey(allowancePrefix, []string{owner, spender})
+	if err != nil {
+		return fmt.Errorf("failed to create the composite key for prefix %s: %v", allowancePrefix, err)
+	}
+
+	err = ctx.PutStateWithoutKYC(allowanceKey, []byte(strconv.Itoa(value)))
+	if err != nil {
+		return fmt.Errorf("failed to update state of smart contract for key %s: %v", allowanceKey, err)
+	}
+
+	approvalEvent := event{owner, spender, value}
+	approvalEventJSON, err := json.Marshal(approvalEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = ctx.SetEvent("Approval", approvalEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return nil
+}
