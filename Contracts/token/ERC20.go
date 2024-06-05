@@ -552,3 +552,60 @@ func checkInitialized(ctx kalpsdk.TransactionContextInterface) (bool, error) {
 	}
 	return true, nil
 }
+
+
+func transferHelper(ctx kalpsdk.TransactionContextInterface, from string, to string, value int) error {
+	if from == to {
+		return fmt.Errorf("cannot transfer to and from same client account")
+	}
+	if value < 0 {
+		return fmt.Errorf("transfer amount cannot be negative")
+	}
+
+	fromCurrentBalanceBytes, err := ctx.GetState(from)
+	if err != nil {
+		return fmt.Errorf("failed to read client account %s from world state: %v", from, err)
+	}
+	if fromCurrentBalanceBytes == nil {
+		return fmt.Errorf("client account %s has no balance", from)
+	}
+
+	fromCurrentBalance, _ := strconv.Atoi(string(fromCurrentBalanceBytes))
+	if fromCurrentBalance < value {
+		return fmt.Errorf("client account %s has insufficient funds", from)
+	}
+
+	toCurrentBalanceBytes, err := ctx.GetState(to)
+	if err != nil {
+		return fmt.Errorf("failed to read recipient account %s from world state: %v", to, err)
+	}
+
+	var toCurrentBalance int
+	if toCurrentBalanceBytes == nil {
+		toCurrentBalance = 0
+	} else {
+		toCurrentBalance, _ = strconv.Atoi(string(toCurrentBalanceBytes))
+	}
+
+	fromUpdatedBalance, err := sub(fromCurrentBalance, value)
+	if err != nil {
+		return err
+	}
+
+	toUpdatedBalance, err := add(toCurrentBalance, value)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.PutStateWithoutKYC(from, []byte(strconv.Itoa(fromUpdatedBalance)))
+	if err != nil {
+		return err
+	}
+
+	err = ctx.PutStateWithoutKYC(to, []byte(strconv.Itoa(toUpdatedBalance)))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
