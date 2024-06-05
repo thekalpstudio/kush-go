@@ -452,7 +452,11 @@ func (c *TokenERC20Contract) Approve(ctx kalpsdk.TransactionContextInterface, sp
 
 	return nil
 }
+
+
 func (c *TokenERC20Contract) Allowance(ctx kalpsdk.TransactionContextInterface, owner string, spender string) (int, error) {
+	
+	// Check if the contract is initialized before proceeding.
 	initialized, err := checkInitialized(ctx)
 	if err != nil {
 		return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
@@ -460,12 +464,15 @@ func (c *TokenERC20Contract) Allowance(ctx kalpsdk.TransactionContextInterface, 
 	if !initialized {
 		return 0, fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
 	}
+    // Create a composite key to fetch the allowance from the world state.
+    // The key structure is "allowancePrefix_owner_spender"
 
 	allowanceKey, err := ctx.CreateCompositeKey(allowancePrefix, []string{owner, spender})
 	if err != nil {
 		return 0, fmt.Errorf("failed to create the composite key for prefix %s: %v", allowancePrefix, err)
 	}
 
+    // Retrieve the allowance value (as bytes) from the world state.
 	allowanceBytes, err := ctx.GetState(allowanceKey)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read allowance for %s from world state: %v", allowanceKey, err)
@@ -480,6 +487,7 @@ func (c *TokenERC20Contract) Allowance(ctx kalpsdk.TransactionContextInterface, 
 			return 0, fmt.Errorf("failed to convert allowance: %v", err)
 		}
 	}
+    // Return the allowance for the specified owner-spender pair.
 
 	return allowance, nil
 }
@@ -608,4 +616,27 @@ func transferHelper(ctx kalpsdk.TransactionContextInterface, from string, to str
 	}
 
 	return nil
+}
+
+// add performs addition with overflow checking for positive numbers
+func add(b int, q int) (int, error) {
+	sum := q + b
+
+	// Check for overflow when both operands are non-negative.
+    // Overflow occurs if the sum is less than either operand (due to wrapping around).
+	if (sum < q || sum < b) == (b >= 0 && q >= 0) {
+		return 0, fmt.Errorf("Math: addition overflow occurred %d + %d", b, q)
+	}
+	return sum, nil
+}
+// sub performs subtraction with input validation and underflow checking.
+func sub(b int, q int) (int, error) {
+	if q <= 0 {
+		return 0, fmt.Errorf("Error: the subtraction number is %d, it should be greater than 0", q)
+	}
+	if b < q {
+		return 0, fmt.Errorf("Error: the number %d is not enough to be subtracted by %d", b, q)
+	}
+	diff := b - q
+	return diff, nil
 }
