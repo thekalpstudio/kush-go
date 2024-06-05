@@ -452,3 +452,34 @@ func (c *TokenERC20Contract) Approve(ctx kalpsdk.TransactionContextInterface, sp
 
 	return nil
 }
+func (c *TokenERC20Contract) Allowance(ctx kalpsdk.TransactionContextInterface, owner string, spender string) (int, error) {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return 0, fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	allowanceKey, err := ctx.CreateCompositeKey(allowancePrefix, []string{owner, spender})
+	if err != nil {
+		return 0, fmt.Errorf("failed to create the composite key for prefix %s: %v", allowancePrefix, err)
+	}
+
+	allowanceBytes, err := ctx.GetState(allowanceKey)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read allowance for %s from world state: %v", allowanceKey, err)
+	}
+
+	var allowance int
+	if allowanceBytes == nil {
+		allowance = 0
+	} else {
+		allowance, err = strconv.Atoi(string(allowanceBytes))
+		if err != nil {
+			return 0, fmt.Errorf("failed to convert allowance: %v", err)
+		}
+	}
+
+	return allowance, nil
+}
