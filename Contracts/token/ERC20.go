@@ -358,4 +358,24 @@ func (c *TokenERC20Contract) ClientAccountBalance(ctx kalpsdk.TransactionContext
 	return balance, nil
 }
 
+// ClientAccountID returns the client account ID associated with the token ERC20 contract.
+// It checks if the contract is initialized, retrieves the client account ID, and returns it.
+// If there is an error during the process, it returns an empty string and the error.
+func (c *TokenERC20Contract) ClientAccountID(ctx kalpsdk.TransactionContextInterface) (string, error) {
+    // Check if the contract is initialized
+    initialized, err := checkInitialized(ctx)
+    if err != nil {
+        return "", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+    }
+    if !initialized {
+        return "", fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+    }
 
+    // Get the client account ID
+    clientAccountID, err := ctx.GetUserID()
+    if err != nil {
+        return "", fmt.Errorf("failed to get client id: %v", err)
+    }
+
+    return clientAccountID, nil
+}
