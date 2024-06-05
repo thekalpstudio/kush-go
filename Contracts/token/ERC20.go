@@ -144,3 +144,116 @@ func (c *TokenERC20Contract) Mint(ctx kalpsdk.TransactionContextInterface, amoun
 
 	return nil
 }
+
+func (c *TokenERC20Contract) Burn(ctx kalpsdk.TransactionContextInterface, amount int) error {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	clientMSPID, err := ctx.GetClientIdentity().GetMSPID()
+	if err != nil {
+		return fmt.Errorf("failed to get MSPID: %v", err)
+	}
+	if clientMSPID != "mailabs" {
+		return fmt.Errorf("client is not authorized to burn tokens")
+	}
+
+	minter, err := ctx.GetUserID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+
+	if amount <= 0 {
+		return errors.New("burn amount must be a positive integer")
+	}
+
+	currentBalanceBytes, err := ctx.GetState(minter)
+	if err != nil {
+		return fmt.Errorf("failed to read minter account %s from world state: %v", minter, err)
+	}
+
+	if currentBalanceBytes == nil {
+		return errors.New("the balance does not exist")
+	}
+
+	currentBalance, _ := strconv.Atoi(string(currentBalanceBytes))
+
+	updatedBalance, err := sub(currentBalance, amount)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.PutStateWithoutKYC(minter, []byte(strconv.Itoa(updatedBalance)))
+	if err != nil {
+		return err
+	}
+
+	totalSupplyBytes, err := ctx.GetState(totalSupplyKey)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve total token supply: %v", err)
+	}
+
+	if totalSupplyBytes == nil {
+		return errors.New("totalSupply does not exist")
+	}
+
+	totalSupply, _ := strconv.Atoi(string(totalSupplyBytes))
+
+	totalSupply, err = sub(totalSupply, amount)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.PutStateWithoutKYC(totalSupplyKey, []byte(strconv.Itoa(totalSupply)))
+	if err != nil {
+		return err
+	}
+
+	transferEvent := event{minter, "0x0", amount}
+	transferEventJSON, err := json.Marshal(transferEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = ctx.SetEvent("Transfer", transferEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return nil
+}
+
+func (c *TokenERC20Contract) Transfer(ctx kalpsdk.TransactionContextInterface, recipient string, amount int) error {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	clientID, err := ctx.GetUserID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+
+	err = transferHelper(ctx, clientID, recipient, amount)
+	if err != nil {
+		return fmt.Errorf("failed to transfer: %v", err)
+	}
+
+	transferEvent := event{clientID, recipient, amount}
+	transferEventJSON, err := json.Marshal(transferEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = ctx.SetEvent("Transfer", transferEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return nil
+}
