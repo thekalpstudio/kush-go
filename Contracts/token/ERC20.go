@@ -483,3 +483,61 @@ func (c *TokenERC20Contract) Allowance(ctx kalpsdk.TransactionContextInterface, 
 
 	return allowance, nil
 }
+func (c *TokenERC20Contract) TransferFrom(ctx kalpsdk.TransactionContextInterface, from string, to string, value int) error {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	spender, err := ctx.GetUserID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+
+	allowanceKey, err := ctx.CreateCompositeKey(allowancePrefix, []string{from, spender})
+	if err != nil {
+		return fmt.Errorf("failed to create the composite key for prefix %s: %v", allowancePrefix, err)
+	}
+
+	currentAllowanceBytes, err := ctx.GetState(allowanceKey)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve the allowance for %s from world state: %v", allowanceKey, err)
+	}
+
+	var currentAllowance int
+	currentAllowance, _ = strconv.Atoi(string(currentAllowanceBytes))
+
+	if currentAllowance < value {
+		return fmt.Errorf("spender does not have enough allowance for transfer")
+	}
+
+	err = transferHelper(ctx, from, to, value)
+	if err != nil {
+		return fmt.Errorf("failed to transfer: %v", err)
+	}
+
+	updatedAllowance, err := sub(currentAllowance, value)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.PutStateWithoutKYC(allowanceKey, []byte(strconv.Itoa(updatedAllowance)))
+	if err != nil {
+		return err
+	}
+
+	transferEvent := event{from, to, value}
+	transferEventJSON, err := json.Marshal(transferEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = ctx.SetEvent("Transfer", transferEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return nil
+}
