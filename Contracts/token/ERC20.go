@@ -379,3 +379,31 @@ func (c *TokenERC20Contract) ClientAccountID(ctx kalpsdk.TransactionContextInter
 
     return clientAccountID, nil
 }
+
+// TotalSupply returns the total supply of tokens in the ERC20 contract.
+// It checks if the contract is already initialized and retrieves the total token supply from the state.
+// If the total supply is not found in the state, it returns 0.
+// It returns the total supply and any error encountered during the process.
+func (c *TokenERC20Contract) TotalSupply(ctx kalpsdk.TransactionContextInterface) (int, error) {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return 0, fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	totalSupplyBytes, err := ctx.GetState(totalSupplyKey)
+	if err != nil {
+		return 0, fmt.Errorf("failed to retrieve total token supply: %v", err)
+	}
+
+	var totalSupply int
+	if totalSupplyBytes == nil {
+		totalSupply = 0
+	} else {
+		totalSupply, _ = strconv.Atoi(string(totalSupplyBytes))
+	}
+
+	return totalSupply, nil
+}
