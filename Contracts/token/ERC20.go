@@ -452,3 +452,191 @@ func (c *TokenERC20Contract) Approve(ctx kalpsdk.TransactionContextInterface, sp
 
 	return nil
 }
+
+
+func (c *TokenERC20Contract) Allowance(ctx kalpsdk.TransactionContextInterface, owner string, spender string) (int, error) {
+	
+	// Check if the contract is initialized before proceeding.
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return 0, fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+    // Create a composite key to fetch the allowance from the world state.
+    // The key structure is "allowancePrefix_owner_spender"
+
+	allowanceKey, err := ctx.CreateCompositeKey(allowancePrefix, []string{owner, spender})
+	if err != nil {
+		return 0, fmt.Errorf("failed to create the composite key for prefix %s: %v", allowancePrefix, err)
+	}
+
+    // Retrieve the allowance value (as bytes) from the world state.
+	allowanceBytes, err := ctx.GetState(allowanceKey)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read allowance for %s from world state: %v", allowanceKey, err)
+	}
+
+	var allowance int
+	if allowanceBytes == nil {
+		allowance = 0
+	} else {
+		allowance, err = strconv.Atoi(string(allowanceBytes))
+		if err != nil {
+			return 0, fmt.Errorf("failed to convert allowance: %v", err)
+		}
+	}
+    // Return the allowance for the specified owner-spender pair.
+
+	return allowance, nil
+}
+func (c *TokenERC20Contract) TransferFrom(ctx kalpsdk.TransactionContextInterface, from string, to string, value int) error {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	spender, err := ctx.GetUserID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+
+	allowanceKey, err := ctx.CreateCompositeKey(allowancePrefix, []string{from, spender})
+	if err != nil {
+		return fmt.Errorf("failed to create the composite key for prefix %s: %v", allowancePrefix, err)
+	}
+
+	currentAllowanceBytes, err := ctx.GetState(allowanceKey)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve the allowance for %s from world state: %v", allowanceKey, err)
+	}
+
+	var currentAllowance int
+	currentAllowance, _ = strconv.Atoi(string(currentAllowanceBytes))
+
+	if currentAllowance < value {
+		return fmt.Errorf("spender does not have enough allowance for transfer")
+	}
+
+	err = transferHelper(ctx, from, to, value)
+	if err != nil {
+		return fmt.Errorf("failed to transfer: %v", err)
+	}
+
+	updatedAllowance, err := sub(currentAllowance, value)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.PutStateWithoutKYC(allowanceKey, []byte(strconv.Itoa(updatedAllowance)))
+	if err != nil {
+		return err
+	}
+
+	transferEvent := event{from, to, value}
+	transferEventJSON, err := json.Marshal(transferEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = ctx.SetEvent("Transfer", transferEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+
+	return nil
+}
+
+func checkInitialized(ctx kalpsdk.TransactionContextInterface) (bool, error) {
+	tokenName, err := ctx.GetState(nameKey)
+	if err != nil {
+		return false, fmt.Errorf("failed to get token name: %v", err)
+	}
+	if tokenName == nil {
+		return false, nil
+	}
+	return true, nil
+}
+
+
+func transferHelper(ctx kalpsdk.TransactionContextInterface, from string, to string, value int) error {
+	if from == to {
+		return fmt.Errorf("cannot transfer to and from same client account")
+	}
+	if value < 0 {
+		return fmt.Errorf("transfer amount cannot be negative")
+	}
+
+	fromCurrentBalanceBytes, err := ctx.GetState(from)
+	if err != nil {
+		return fmt.Errorf("failed to read client account %s from world state: %v", from, err)
+	}
+	if fromCurrentBalanceBytes == nil {
+		return fmt.Errorf("client account %s has no balance", from)
+	}
+
+	fromCurrentBalance, _ := strconv.Atoi(string(fromCurrentBalanceBytes))
+	if fromCurrentBalance < value {
+		return fmt.Errorf("client account %s has insufficient funds", from)
+	}
+
+	toCurrentBalanceBytes, err := ctx.GetState(to)
+	if err != nil {
+		return fmt.Errorf("failed to read recipient account %s from world state: %v", to, err)
+	}
+
+	var toCurrentBalance int
+	if toCurrentBalanceBytes == nil {
+		toCurrentBalance = 0
+	} else {
+		toCurrentBalance, _ = strconv.Atoi(string(toCurrentBalanceBytes))
+	}
+
+	fromUpdatedBalance, err := sub(fromCurrentBalance, value)
+	if err != nil {
+		return err
+	}
+
+	toUpdatedBalance, err := add(toCurrentBalance, value)
+	if err != nil {
+		return err
+	}
+
+	err = ctx.PutStateWithoutKYC(from, []byte(strconv.Itoa(fromUpdatedBalance)))
+	if err != nil {
+		return err
+	}
+
+	err = ctx.PutStateWithoutKYC(to, []byte(strconv.Itoa(toUpdatedBalance)))
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// add performs addition with overflow checking for positive numbers
+func add(b int, q int) (int, error) {
+	sum := q + b
+
+	// Check for overflow when both operands are non-negative.
+    // Overflow occurs if the sum is less than either operand (due to wrapping around).
+	if (sum < q || sum < b) == (b >= 0 && q >= 0) {
+		return 0, fmt.Errorf("Math: addition overflow occurred %d + %d", b, q)
+	}
+	return sum, nil
+}
+// sub performs subtraction with input validation and underflow checking.
+func sub(b int, q int) (int, error) {
+	if q <= 0 {
+		return 0, fmt.Errorf("Error: the subtraction number is %d, it should be greater than 0", q)
+	}
+	if b < q {
+		return 0, fmt.Errorf("Error: the number %d is not enough to be subtracted by %d", b, q)
+	}
+	diff := b - q
+	return diff, nil
+}
