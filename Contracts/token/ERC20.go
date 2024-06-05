@@ -409,6 +409,13 @@ func (c *TokenERC20Contract) TotalSupply(ctx kalpsdk.TransactionContextInterface
 }
 
 
+// Approve allows the owner of the token to approve the spender to spend a certain amount of tokens on their behalf.
+// It updates the allowance state of the smart contract and emits an "Approval" event.
+// If the contract is not initialized, it returns an error.
+// If there is an error while checking the contract initialization, getting the client ID, creating the composite key,
+// updating the state, encoding the event, or setting the event, it returns an error.
+// Otherwise, it returns nil.
+
 func (c *TokenERC20Contract) Approve(ctx kalpsdk.TransactionContextInterface, spender string, value int) error {
 	initialized, err := checkInitialized(ctx)
 	if err != nil {
