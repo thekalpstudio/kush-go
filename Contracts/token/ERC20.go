@@ -327,3 +327,35 @@ func (c *TokenERC20Contract) BalanceOf(ctx kalpsdk.TransactionContextInterface, 
 	balance, _ := strconv.Atoi(string(balanceBytes))
 	return balance, nil
 }
+
+// ClientAccountBalance returns the balance of the client's account.
+// It checks if the contract is already initialized and if the client's account exists.
+// If the account exists, it retrieves the balance from the world state and returns it.
+// If the account does not exist, it returns an error.
+func (c *TokenERC20Contract) ClientAccountBalance(ctx kalpsdk.TransactionContextInterface) (int, error) {
+	initialized, err := checkInitialized(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if !initialized {
+		return 0, fmt.Errorf("contract options need to be set before calling any function, call Initialize() to initialize contract")
+	}
+
+	clientID, err := ctx.GetUserID()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get client id: %v", err)
+	}
+
+	balanceBytes, err := ctx.GetState(clientID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to read from world state: %v", err)
+	}
+	if balanceBytes == nil {
+		return 0, fmt.Errorf("the account %s does not exist", clientID)
+	}
+
+	balance, _ := strconv.Atoi(string(balanceBytes))
+	return balance, nil
+}
+
+
