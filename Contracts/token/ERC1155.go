@@ -80,3 +80,61 @@ func (s *SmartContract) Mint(sdk kalpsdk.TransactionContextInterface, account st
 	transferSingleEvent := TransferSingle{operator, "0x0", account, id, amount}
 	return emitTransferSingle(sdk, transferSingleEvent)
 }
+
+// Mint creates amount tokens of token type id and assigns them to account.
+func (s *SmartContract) Mint(sdk kalpsdk.TransactionContextInterface, account string, id uint64, amount uint64) error {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	err = authorizationHelper(sdk)
+	if err != nil {
+		return err
+	}
+	operator, err := sdk.GetClientIdentity().GetID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+	err = mintHelper(sdk, operator, account, id, amount)
+	if err != nil {
+		return err
+	}
+	transferSingleEvent := TransferSingle{operator, "0x0", account, id, amount}
+	return emitTransferSingle(sdk, transferSingleEvent)
+}
+
+// MintBatch creates amount tokens for each token type id and assigns them to account.
+func (s *SmartContract) MintBatch(sdk kalpsdk.TransactionContextInterface, account string, ids []uint64, amounts []uint64) error {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if len(ids) != len(amounts) {
+		return fmt.Errorf("ids and amounts must have the same length")
+	}
+	err = authorizationHelper(sdk)
+	if err != nil {
+		return err
+	}
+	operator, err := sdk.GetClientIdentity().GetID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+	amountToSend := make(map[uint64]uint64)
+	for i := 0; i < len(amounts); i++ {
+		amountToSend[ids[i]], err = add(amountToSend[ids[i]], amounts[i])
+		if err != nil {
+			return err
+		}
+	}
+	amountToSendKeys := sortedKeys(amountToSend)
+	for _, id := range amountToSendKeys {
+		amount := amountToSend[id]
+		err = mintHelper(sdk, operator, account, id, amount)
+		if err != nil {
+			return err
+		}
+	}
+	transferBatchEvent := TransferBatch{operator, "0x0", account, ids, amounts}
+	return emitTransferBatch(sdk, transferBatchEvent)
+}
