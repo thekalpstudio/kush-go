@@ -437,3 +437,13 @@ func (s *SmartContract) Initialize(sdk kalpsdk.TransactionContextInterface, name
 	}
 	return true, nil
 }
+
+// Helper Functions
+
+func authorizationHelper(sdk kalpsdk.TransactionContextInterface) error {
+	clientMSPID, err := sdk.GetClientIdentity().GetMSPID()
+	if err != nil || clientMSPID != minterMSPID {
+		return fmt.Errorf("client is not authorized to mint new tokens")
+	}
+	return nil
+}
