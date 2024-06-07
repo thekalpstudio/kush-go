@@ -447,3 +447,12 @@ func authorizationHelper(sdk kalpsdk.TransactionContextInterface) error {
 	}
 	return nil
 }
+func mintHelper(sdk kalpsdk.TransactionContextInterface, operator string, account string, id uint64, amount uint64) error {
+	if account == "0x0" {
+		return fmt.Errorf("mint to the zero address")
+	}
+	if amount <= 0 {
+		return fmt.Errorf("mint amount must be a positive integer")
+	}
+	return addBalance(sdk, operator, account, id, amount)
+}
