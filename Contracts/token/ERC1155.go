@@ -162,3 +162,38 @@ func (s *SmartContract) Burn(sdk kalpsdk.TransactionContextInterface, account st
 	transferSingleEvent := TransferSingle{operator, account, "0x0", id, amount}
 	return emitTransferSingle(sdk, transferSingleEvent)
 }
+
+
+// TransferFrom transfers tokens from sender account to recipient account.
+func (s *SmartContract) TransferFrom(sdk kalpsdk.TransactionContextInterface, sender string, recipient string, id uint64, amount uint64) error {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if sender == recipient {
+		return fmt.Errorf("transfer to self")
+	}
+	operator, err := sdk.GetClientIdentity().GetID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+	if operator != sender {
+		approved, err := _isApprovedForAll(sdk, sender, operator)
+		if err != nil || !approved {
+			return fmt.Errorf("caller is not owner nor is approved")
+		}
+	}
+	err = removeBalance(sdk, sender, []uint64{id}, []uint64{amount})
+	if err != nil {
+		return err
+	}
+	if recipient == "0x0" {
+		return fmt.Errorf("transfer to the zero address")
+	}
+	err = addBalance(sdk, sender, recipient, id, amount)
+	if err != nil {
+		return err
+	}
+	transferSingleEvent := TransferSingle{operator, sender, recipient, id, amount}
+	return emitTransferSingle(sdk, transferSingleEvent)
+}
