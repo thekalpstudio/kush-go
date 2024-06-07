@@ -367,3 +367,16 @@ func (s *SmartContract) ClientAccountID(sdk kalpsdk.TransactionContextInterface)
 	}
 	return clientAccountID, nil
 }
+
+// URI returns the URI
+func (s *SmartContract) URI(sdk kalpsdk.TransactionContextInterface, id uint64) (string, error) {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return "", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	uriBytes, err := sdk.GetState(uriKey)
+	if err != nil || uriBytes == nil {
+		return "", fmt.Errorf("failed to get uri: %v", err)
+	}
+	return string(uriBytes), nil
+}
