@@ -224,3 +224,51 @@ func (s *SmartContract) BurnBatch(sdk kalpsdk.TransactionContextInterface, accou
 	transferBatchEvent := TransferBatch{operator, account, "0x0", ids, amounts}
 	return emitTransferBatch(sdk, transferBatchEvent)
 }
+
+// BatchTransferFrom transfers multiple tokens from sender account to recipient account.
+func (s *SmartContract) BatchTransferFrom(sdk kalpsdk.TransactionContextInterface, sender string, recipient string, ids []uint64, amounts []uint64) error {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if sender == recipient {
+		return fmt.Errorf("transfer to self")
+	}
+	if len(ids) != len(amounts) {
+		return fmt.Errorf("ids and amounts must have the same length")
+	}
+	operator, err := sdk.GetClientIdentity().GetID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+	if operator != sender {
+		approved, err := _isApprovedForAll(sdk, sender, operator)
+		if err != nil || !approved {
+			return fmt.Errorf("caller is not owner nor is approved")
+		}
+	}
+	err = removeBalance(sdk, sender, ids, amounts)
+	if err != nil {
+		return err
+	}
+	if recipient == "0x0" {
+		return fmt.Errorf("transfer to the zero address")
+	}
+	amountToSend := make(map[uint64]uint64)
+	for i := 0; i < len(amounts); i++ {
+		amountToSend[ids[i]], err = add(amountToSend[ids[i]], amounts[i])
+		if err != nil {
+			return err
+		}
+	}
+	amountToSendKeys := sortedKeys(amountToSend)
+	for _, id := range amountToSendKeys {
+		amount := amountToSend[id]
+		err = addBalance(sdk, sender, recipient, id, amount)
+		if err != nil {
+			return err
+		}
+	}
+	transferBatchEvent := TransferBatch{operator, sender, recipient, ids, amounts}
+	return emitTransferBatch(sdk, transferBatchEvent)
+}
