@@ -323,3 +323,21 @@ func (s *SmartContract) BalanceOf(sdk kalpsdk.TransactionContextInterface, accou
 	}
 	return balanceOfHelper(sdk, account, id)
 }
+// BalanceOfBatch returns the balance of multiple account/token pairs
+func (s *SmartContract) BalanceOfBatch(sdk kalpsdk.TransactionContextInterface, accounts []string, ids []uint64) ([]uint64, error) {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return nil, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if len(accounts) != len(ids) {
+		return nil, fmt.Errorf("accounts and ids must have the same length")
+	}
+	balances := make([]uint64, len(accounts))
+	for i := 0; i < len(accounts); i++ {
+		balances[i], err = balanceOfHelper(sdk, accounts[i], ids[i])
+		if err != nil {
+			return nil, err
+		}
+	}
+	return balances, nil
+}
