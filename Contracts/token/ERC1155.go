@@ -380,3 +380,23 @@ func (s *SmartContract) URI(sdk kalpsdk.TransactionContextInterface, id uint64) 
 	}
 	return string(uriBytes), nil
 }
+
+// SetURI set the URI value
+func (s *SmartContract) SetURI(sdk kalpsdk.TransactionContextInterface, uri string) error {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	err = authorizationHelper(sdk)
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(uri, "{id}") {
+		return fmt.Errorf("failed to set uri, uri should contain '{id}'")
+	}
+	err = sdk.PutStateWithoutKYC(uriKey, []byte(uri))
+	if err != nil {
+		return fmt.Errorf("failed to set uri: %v", err)
+	}
+	return nil
+}
