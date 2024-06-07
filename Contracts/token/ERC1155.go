@@ -400,3 +400,16 @@ func (s *SmartContract) SetURI(sdk kalpsdk.TransactionContextInterface, uri stri
 	}
 	return nil
 }
+
+// Symbol returns an abbreviated name for fungible tokens in this contract.
+func (s *SmartContract) Symbol(sdk kalpsdk.TransactionContextInterface) (string, error) {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return "", fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	bytes, err := sdk.GetState(symbolKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to get Symbol: %v", err)
+	}
+	return string(bytes), nil
+}
