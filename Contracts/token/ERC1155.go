@@ -59,3 +59,24 @@ type URI struct {
 	Value string `json:"value"`
 	ID    uint64 `json:"id"`
 }
+// Mint creates amount tokens of token type id and assigns them to account.
+func (s *SmartContract) Mint(sdk kalpsdk.TransactionContextInterface, account string, id uint64, amount uint64) error {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	err = authorizationHelper(sdk)
+	if err != nil {
+		return err
+	}
+	operator, err := sdk.GetClientIdentity().GetID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+	err = mintHelper(sdk, operator, account, id, amount)
+	if err != nil {
+		return err
+	}
+	transferSingleEvent := TransferSingle{operator, "0x0", account, id, amount}
+	return emitTransferSingle(sdk, transferSingleEvent)
+}
