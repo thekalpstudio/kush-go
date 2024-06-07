@@ -413,3 +413,27 @@ func (s *SmartContract) Symbol(sdk kalpsdk.TransactionContextInterface) (string,
 	}
 	return string(bytes), nil
 }
+
+// Set information for a token and initialize contract.
+func (s *SmartContract) Initialize(sdk kalpsdk.TransactionContextInterface, name string, symbol string) (bool, error) {
+	clientMSPID, err := sdk.GetClientIdentity().GetMSPID()
+	if err != nil {
+		return false, fmt.Errorf("failed to get MSPID: %v", err)
+	}
+	if clientMSPID != minterMSPID {
+		return false, fmt.Errorf("client is not authorized to initialize contract")
+	}
+	bytes, err := sdk.GetState(nameKey)
+	if err != nil || bytes != nil {
+		return false, fmt.Errorf("contract options are already set, client is not authorized to change them")
+	}
+	err = sdk.PutStateWithoutKYC(nameKey, []byte(name))
+	if err != nil {
+		return false, fmt.Errorf("failed to set token name: %v", err)
+	}
+	err = sdk.PutStateWithoutKYC(symbolKey, []byte(symbol))
+	if err != nil {
+		return false, fmt.Errorf("failed to set symbol: %v", err)
+	}
+	return true, nil
+}
