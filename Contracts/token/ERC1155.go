@@ -341,3 +341,16 @@ func (s *SmartContract) BalanceOfBatch(sdk kalpsdk.TransactionContextInterface, 
 	}
 	return balances, nil
 }
+
+// ClientAccountBalance returns the balance of the requesting client's account
+func (s *SmartContract) ClientAccountBalance(sdk kalpsdk.TransactionContextInterface, id uint64) (uint64, error) {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	clientID, err := sdk.GetClientIdentity().GetID()
+	if err != nil {
+		return 0, fmt.Errorf("failed to get client id: %v", err)
+	}
+	return balanceOfHelper(sdk, clientID, id)
+}
