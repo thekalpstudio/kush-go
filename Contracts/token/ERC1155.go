@@ -138,3 +138,27 @@ func (s *SmartContract) MintBatch(sdk kalpsdk.TransactionContextInterface, accou
 	transferBatchEvent := TransferBatch{operator, "0x0", account, ids, amounts}
 	return emitTransferBatch(sdk, transferBatchEvent)
 }
+// Burn destroys amount tokens of token type id from account.
+func (s *SmartContract) Burn(sdk kalpsdk.TransactionContextInterface, account string, id uint64, amount uint64) error {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	if account == "0x0" {
+		return fmt.Errorf("burn to the zero address")
+	}
+	err = authorizationHelper(sdk)
+	if err != nil {
+		return err
+	}
+	operator, err := sdk.GetClientIdentity().GetID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+	err = removeBalance(sdk, account, []uint64{id}, []uint64{amount})
+	if err != nil {
+		return err
+	}
+	transferSingleEvent := TransferSingle{operator, account, "0x0", id, amount}
+	return emitTransferSingle(sdk, transferSingleEvent)
+}
