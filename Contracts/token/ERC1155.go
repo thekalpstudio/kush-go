@@ -314,3 +314,12 @@ func (s *SmartContract) SetApprovalForAll(sdk kalpsdk.TransactionContextInterfac
 	}
 	return nil
 }
+
+// BalanceOf returns the balance of the given account
+func (s *SmartContract) BalanceOf(sdk kalpsdk.TransactionContextInterface, account string, id uint64) (uint64, error) {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return 0, fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	return balanceOfHelper(sdk, account, id)
+}
