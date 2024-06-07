@@ -272,3 +272,45 @@ func (s *SmartContract) BatchTransferFrom(sdk kalpsdk.TransactionContextInterfac
 	transferBatchEvent := TransferBatch{operator, sender, recipient, ids, amounts}
 	return emitTransferBatch(sdk, transferBatchEvent)
 }
+
+// IsApprovedForAll returns true if operator is approved to transfer account's tokens.
+func (s *SmartContract) IsApprovedForAll(sdk kalpsdk.TransactionContextInterface, account string, operator string) (bool, error) {
+	return _isApprovedForAll(sdk, account, operator)
+}
+
+// SetApprovalForAll returns true if operator is approved to transfer account's tokens.
+func (s *SmartContract) SetApprovalForAll(sdk kalpsdk.TransactionContextInterface, operator string, approved bool) error {
+	initialized, err := checkInitialized(sdk)
+	if err != nil || !initialized {
+		return fmt.Errorf("failed to check if contract is already initialized: %v", err)
+	}
+	account, err := sdk.GetClientIdentity().GetID()
+	if err != nil {
+		return fmt.Errorf("failed to get client id: %v", err)
+	}
+	if account == operator {
+		return fmt.Errorf("setting approval status for self")
+	}
+	approvalForAllEvent := ApprovalForAll{account, operator, approved}
+	approvalForAllEventJSON, err := json.Marshal(approvalForAllEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = sdk.SetEvent("ApprovalForAll", approvalForAllEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+	approvalKey, err := sdk.CreateCompositeKey(approvalPrefix, []string{account, operator})
+	if err != nil {
+		return fmt.Errorf("failed to create the composite key for prefix %s: %v", approvalPrefix, err)
+	}
+	approvalJSON, err := json.Marshal(approved)
+	if err != nil {
+		return fmt.Errorf("failed to encode approval JSON of operator %s for account %s: %v", operator, account, err)
+	}
+	err = sdk.PutStateWithoutKYC(approvalKey, approvalJSON)
+	if err != nil {
+		return err
+	}
+	return nil
+}
