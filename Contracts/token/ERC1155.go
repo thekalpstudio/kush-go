@@ -457,6 +457,13 @@ func mintHelper(sdk kalpsdk.TransactionContextInterface, operator string, accoun
 	return addBalance(sdk, operator, account, id, amount)
 }
 
+// addBalance is a function that adds the specified amount of tokens to the balance of a recipient.
+// It takes a transaction context interface, sender address, recipient address, token ID, and amount as parameters.
+// The function creates a composite key using the recipient, token ID, and sender address.
+// It then retrieves the current balance from the world state using the composite key.
+// If the balance exists, it is parsed into a uint64 value.
+// The function adds the specified amount to the balance using the add function.
+// Finally, it updates the balance in the world state and returns any error that occurred during the process.
 func addBalance(sdk kalpsdk.TransactionContextInterface, sender string, recipient string, id uint64, amount uint64) error {
 	idString := strconv.FormatUint(uint64(id), 10)
 	balanceKey, err := sdk.CreateCompositeKey(balancePrefix, []string{recipient, idString, sender})
@@ -476,4 +483,23 @@ func addBalance(sdk kalpsdk.TransactionContextInterface, sender string, recipien
 		return err
 	}
 	return sdk.PutStateWithoutKYC(balanceKey, []byte(strconv.FormatUint(uint64(balance), 10)))
+}
+
+// setBalance sets the balance of a specific token for a given sender and recipient.
+// It creates a composite key using the recipient, token ID, and sender, and stores the balance amount in the state.
+// Parameters:
+// - sdk: The transaction context interface for interacting with the blockchain.
+// - sender: The address of the sender.
+// - recipient: The address of the recipient.
+// - id: The ID of the token.
+// - amount: The amount to set as the balance.
+// Returns:
+// - error: An error if the composite key creation or state update fails.
+func setBalance(sdk kalpsdk.TransactionContextInterface, sender string, recipient string, id uint64, amount uint64) error {
+	idString := strconv.FormatUint(uint64(id), 10)
+	balanceKey, err := sdk.CreateCompositeKey(balancePrefix, []string{recipient, idString, sender})
+	if err != nil {
+		return fmt.Errorf("failed to create the composite key for prefix %s: %v", balancePrefix, err)
+	}
+	return sdk.PutStateWithoutKYC(balanceKey, []byte(strconv.FormatUint(uint64(amount), 10)))
 }
