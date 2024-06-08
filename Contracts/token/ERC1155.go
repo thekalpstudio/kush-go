@@ -638,3 +638,28 @@ func emitTransferBatch(sdk kalpsdk.TransactionContextInterface, transferBatchEve
 	}
 	return nil
 }
+
+func balanceOfHelper(sdk kalpsdk.TransactionContextInterface, account string, id uint64) (uint64, error) {
+	if account == "0x0" {
+		return 0, fmt.Errorf("balance query for the zero address")
+	}
+	idString := strconv.FormatUint(uint64(id), 10)
+	var balance uint64
+	balanceIterator, err := sdk.GetStateByPartialCompositeKey(balancePrefix, []string{account, idString})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get state for prefix %v: %v", balancePrefix, err)
+	}
+	defer balanceIterator.Close()
+	for balanceIterator.HasNext() {
+		queryResponse, err := balanceIterator.Next()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get the next state for prefix %v: %v", balancePrefix, err)
+		}
+		balAmount, _ := strconv.ParseUint(string(queryResponse.Value), 10, 64)
+		balance, err = add(balance, balAmount)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return balance, nil
+}
