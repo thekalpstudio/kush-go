@@ -503,3 +503,113 @@ func setBalance(sdk kalpsdk.TransactionContextInterface, sender string, recipien
 	}
 	return sdk.PutStateWithoutKYC(balanceKey, []byte(strconv.FormatUint(uint64(amount), 10)))
 }
+    
+func removeBalance(sdk kalpsdk.TransactionContextInterface, sender string, ids []uint64, amounts []uint64) error {
+    // Create a map to store the necessary funds for each token ID
+    necessaryFunds := make(map[uint64]uint64)
+    var err error
+    
+    // Iterate over the IDs and amounts to calculate the necessary funds
+    for i := 0; i < len(amounts); i++ {
+        // Add the amount to the necessary funds for the current token ID
+        necessaryFunds[ids[i]], err = add(necessaryFunds[ids[i]], amounts[i])
+        if err != nil {
+            return err
+        }
+    }
+    
+    // Get the sorted keys of the necessary funds map
+    necessaryFundsKeys := sortedKeys(necessaryFunds)
+    
+    // Iterate over the necessary funds keys
+    for _, tokenId := range necessaryFundsKeys {
+        // Get the needed amount for the current token ID
+        neededAmount := necessaryFunds[tokenId]
+        
+        // Convert the token ID to a string
+        idString := strconv.FormatUint(uint64(tokenId), 10)
+        
+        // Initialize the partial balance and self recipient key variables
+        partialBalance := uint64(0)
+        selfRecipientKeyNeedsToBeRemoved := false
+        selfRecipientKey := ""
+        
+        // Get the balance iterator for the sender and token ID
+        balanceIterator, err := sdk.GetStateByPartialCompositeKey(balancePrefix, []string{sender, idString})
+        if err != nil {
+            return fmt.Errorf("failed to get state for prefix %v: %v", balancePrefix, err)
+        }
+        defer balanceIterator.Close()
+        
+        // Iterate over the balance iterator
+        for balanceIterator.HasNext() && partialBalance < neededAmount {
+            // Get the next query response
+            queryResponse, err := balanceIterator.Next()
+            if err != nil {
+                return fmt.Errorf("failed to get the next state for prefix %v: %v", balancePrefix, err)
+            }
+            
+            // Parse the part balance amount from the query response value
+            partBalAmount, _ := strconv.ParseUint(string(queryResponse.Value), 10, 64)
+            
+            // Add the part balance amount to the partial balance
+            partialBalance, err = add(partialBalance, partBalAmount)
+            if err != nil {
+                return err
+            }
+            
+            // Split the composite key into parts
+            _, compositeKeyParts, err := sdk.SplitCompositeKey(queryResponse.Key)
+            if err != nil {
+                return err
+            }
+            
+            // Check if the sender is the recipient
+            if compositeKeyParts[2] == sender {
+                // Set the self recipient key needs to be removed flag and store the self recipient key
+                selfRecipientKeyNeedsToBeRemoved = true
+                selfRecipientKey = queryResponse.Key
+            } else {
+                // Delete the state for the query response key
+                err = sdk.DelStateWithoutKYC(queryResponse.Key)
+                if err != nil {
+                    return fmt.Errorf("failed to delete the state of %v: %v", queryResponse.Key, err)
+                }
+            }
+        }
+        
+        // Check if the partial balance is less than the needed amount
+        if partialBalance < neededAmount {
+            return fmt.Errorf("sender has insufficient funds for token %v, needed funds: %v, available fund: %v", tokenId, neededAmount, partialBalance)
+        } else if partialBalance > neededAmount {
+            // Calculate the remainder
+            remainder, err := sub(partialBalance, neededAmount)
+            if err != nil {
+                return err
+            }
+            
+            // Check if the self recipient key needs to be removed
+            if selfRecipientKeyNeedsToBeRemoved {
+                // Set the balance for the sender and token ID
+                err = setBalance(sdk, sender, sender, tokenId, remainder)
+                if err != nil {
+                    return err
+                }
+            } else {
+                // Add the balance for the sender and token ID
+                err = addBalance(sdk, sender, sender, tokenId, remainder)
+                if err != nil {
+                    return err
+                }
+            }
+        } else {
+            // Delete the self recipient key
+            err = sdk.DelStateWithoutKYC(selfRecipientKey)
+            if err != nil {
+                return fmt.Errorf("failed to delete the state of %v: %v", selfRecipientKey, err)
+            }
+        }
+    }
+    
+    return nil
+}
