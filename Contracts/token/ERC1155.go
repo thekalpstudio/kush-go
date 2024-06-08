@@ -626,3 +626,15 @@ func emitTransferSingle(sdk kalpsdk.TransactionContextInterface, transferSingleE
 	}
 	return nil
 }
+
+func emitTransferBatch(sdk kalpsdk.TransactionContextInterface, transferBatchEvent TransferBatch) error {
+	transferBatchEventJSON, err := json.Marshal(transferBatchEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = sdk.SetEvent("TransferBatch", transferBatchEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+	return nil
+}
