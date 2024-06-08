@@ -613,3 +613,16 @@ func removeBalance(sdk kalpsdk.TransactionContextInterface, sender string, ids [
     
     return nil
 }
+
+ 
+func emitTransferSingle(sdk kalpsdk.TransactionContextInterface, transferSingleEvent TransferSingle) error {
+	transferSingleEventJSON, err := json.Marshal(transferSingleEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = sdk.SetEvent("TransferSingle", transferSingleEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+	return nil
+}
