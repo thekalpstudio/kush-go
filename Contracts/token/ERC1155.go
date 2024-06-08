@@ -674,3 +674,11 @@ func sortedKeys(m map[uint64]uint64) []uint64 {
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	return keys
 }
+
+func checkInitialized(sdk kalpsdk.TransactionContextInterface) (bool, error) {
+	tokenName, err := sdk.GetState(nameKey)
+	if err != nil || tokenName == nil {
+		return false, fmt.Errorf("failed to get token name: %v", err)
+	}
+	return true, nil
+}
