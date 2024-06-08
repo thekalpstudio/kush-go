@@ -690,3 +690,11 @@ func add(b uint64, q uint64) (uint64, error) {
 	}
 	return sum, nil
 }
+
+func sub(b uint64, q uint64) (uint64, error) {
+	diff := b - q
+	if diff > b {
+		return 0, fmt.Errorf("Math: subtraction overflow occurred  %d - %d", b, q)
+	}
+	return diff, nil
+}
