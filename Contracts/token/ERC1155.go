@@ -456,3 +456,24 @@ func mintHelper(sdk kalpsdk.TransactionContextInterface, operator string, accoun
 	}
 	return addBalance(sdk, operator, account, id, amount)
 }
+
+func addBalance(sdk kalpsdk.TransactionContextInterface, sender string, recipient string, id uint64, amount uint64) error {
+	idString := strconv.FormatUint(uint64(id), 10)
+	balanceKey, err := sdk.CreateCompositeKey(balancePrefix, []string{recipient, idString, sender})
+	if err != nil {
+		return fmt.Errorf("failed to create the composite key for prefix %s: %v", balancePrefix, err)
+	}
+	balanceBytes, err := sdk.GetState(balanceKey)
+	if err != nil {
+		return fmt.Errorf("failed to read account %s from world state: %v", recipient, err)
+	}
+	balance := uint64(0)
+	if balanceBytes != nil {
+		balance, _ = strconv.ParseUint(string(balanceBytes), 10, 64)
+	}
+	balance, err = add(balance, amount)
+	if err != nil {
+		return err
+	}
+	return sdk.PutStateWithoutKYC(balanceKey, []byte(strconv.FormatUint(uint64(balance), 10)))
+}
