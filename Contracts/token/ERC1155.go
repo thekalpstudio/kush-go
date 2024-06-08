@@ -682,3 +682,11 @@ func checkInitialized(sdk kalpsdk.TransactionContextInterface) (bool, error) {
 	}
 	return true, nil
 }
+
+func add(b uint64, q uint64) (uint64, error) {
+	sum := q + b
+	if sum < q {
+		return 0, fmt.Errorf("Math: addition overflow occurred %d + %d", b, q)
+	}
+	return sum, nil
+}
