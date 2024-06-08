@@ -663,3 +663,14 @@ func balanceOfHelper(sdk kalpsdk.TransactionContextInterface, account string, id
 	}
 	return balance, nil
 }
+
+func sortedKeys(m map[uint64]uint64) []uint64 {
+	keys := make([]uint64, len(m))
+	i := 0
+	for k := range m {
+		keys[i] = k
+		i++
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys
+}
