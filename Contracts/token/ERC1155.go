@@ -626,3 +626,75 @@ func emitTransferSingle(sdk kalpsdk.TransactionContextInterface, transferSingleE
 	}
 	return nil
 }
+
+func emitTransferBatch(sdk kalpsdk.TransactionContextInterface, transferBatchEvent TransferBatch) error {
+	transferBatchEventJSON, err := json.Marshal(transferBatchEvent)
+	if err != nil {
+		return fmt.Errorf("failed to obtain JSON encoding: %v", err)
+	}
+	err = sdk.SetEvent("TransferBatch", transferBatchEventJSON)
+	if err != nil {
+		return fmt.Errorf("failed to set event: %v", err)
+	}
+	return nil
+}
+
+func balanceOfHelper(sdk kalpsdk.TransactionContextInterface, account string, id uint64) (uint64, error) {
+	if account == "0x0" {
+		return 0, fmt.Errorf("balance query for the zero address")
+	}
+	idString := strconv.FormatUint(uint64(id), 10)
+	var balance uint64
+	balanceIterator, err := sdk.GetStateByPartialCompositeKey(balancePrefix, []string{account, idString})
+	if err != nil {
+		return 0, fmt.Errorf("failed to get state for prefix %v: %v", balancePrefix, err)
+	}
+	defer balanceIterator.Close()
+	for balanceIterator.HasNext() {
+		queryResponse, err := balanceIterator.Next()
+		if err != nil {
+			return 0, fmt.Errorf("failed to get the next state for prefix %v: %v", balancePrefix, err)
+		}
+		balAmount, _ := strconv.ParseUint(string(queryResponse.Value), 10, 64)
+		balance, err = add(balance, balAmount)
+		if err != nil {
+			return 0, err
+		}
+	}
+	return balance, nil
+}
+
+func sortedKeys(m map[uint64]uint64) []uint64 {
+	keys := make([]uint64, len(m))
+	i := 0
+	for k := range m {
+		keys[i] = k
+		i++
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	return keys
+}
+
+func checkInitialized(sdk kalpsdk.TransactionContextInterface) (bool, error) {
+	tokenName, err := sdk.GetState(nameKey)
+	if err != nil || tokenName == nil {
+		return false, fmt.Errorf("failed to get token name: %v", err)
+	}
+	return true, nil
+}
+
+func add(b uint64, q uint64) (uint64, error) {
+	sum := q + b
+	if sum < q {
+		return 0, fmt.Errorf("Math: addition overflow occurred %d + %d", b, q)
+	}
+	return sum, nil
+}
+
+func sub(b uint64, q uint64) (uint64, error) {
+	diff := b - q
+	if diff > b {
+		return 0, fmt.Errorf("Math: subtraction overflow occurred  %d - %d", b, q)
+	}
+	return diff, nil
+}
